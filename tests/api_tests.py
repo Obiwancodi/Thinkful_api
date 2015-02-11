@@ -206,5 +206,146 @@ class TestAPI(unittest.TestCase):
         self.assertEqual(post["title"], "Post with whistles")
         self.assertEqual(post["body"], "Still a bells")
         
+    def testPostPost(self):
+        """ Posting a new post """
+        data = {
+            "title": "Example Post",
+            "body": "Just a test"
+        }
+
+        response = self.client.post("/api/posts",
+            data=json.dumps(data),
+            content_type="application/json",
+            headers=[("Accept", "application/json")]
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.mimetype, "application/json")
+        self.assertEqual(urlparse(response.headers.get("Location")).path,
+                         "/api/posts/1")
+
+        data = json.loads(response.data)
+        self.assertEqual(data["id"], 1)
+        self.assertEqual(data["title"], "Example Post")
+        self.assertEqual(data["body"], "Just a test")
+
+        posts = session.query(models.Post).all()
+        self.assertEqual(len(posts), 1)
+
+        post = posts[0]
+        self.assertEqual(post.title, "Example Post")
+        self.assertEqual(post.body, "Just a test")         
+        
+    def testUnsupportedMimetype(self):
+        data = "<xml></xml>"
+        response = self.client.post("/api/posts",
+            data=json.dumps(data),
+            content_type="application/xml",
+            headers=[("Accept", "application/json")]
+        )
+
+        self.assertEqual(response.status_code, 415)
+        self.assertEqual(response.mimetype, "application/json")
+
+        data = json.loads(response.data)
+        self.assertEqual(data["message"],
+                         "Request must contain application/json data")
+    def testInvalidData(self):
+        """ Posting a post with an invalid body """
+        data = {
+            "title": "Example Post",
+            "body": 32
+        }
+
+        response = self.client.post("/api/posts",
+            data=json.dumps(data),
+            content_type="application/json",
+            headers=[("Accept", "application/json")]
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+        data = json.loads(response.data)
+        self.assertEqual(data["message"], "32 is not of type 'string'")
+
+    def testMissingData(self):
+        """ Posting a post with a missing body """
+        data = {
+            "title": "Example Post",
+        }
+
+        response = self.client.post("/api/posts",
+            data=json.dumps(data),
+            content_type="application/json",
+            headers=[("Accept", "application/json")]
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+        data = json.loads(response.data)
+        self.assertEqual(data["message"], "'body' is a required property")
+        
+    def testEditPost(self):
+        """ Testing Edit Post"""
+        data = {
+            "title": "Example Post C",
+            "body": "Just a test"
+        }
+        postC = models.Post(title="Example Post C", body="Just a test")
+        session.add(postC)
+        session.commit()
+        
+        
+        posts = session.query(models.Post).all()
+        self.assertEqual(len(posts),1)
+        
+        post = posts[0]
+        self.assertEqual(post.id, 1)
+        self.assertEqual(post.title, "Example Post C")
+        self.assertEqual(post.body, "Just a test")
+        
+        data = {
+            "title": "Example Post",
+            "body": "Just another test"
+        }
+        
+        post.title = "Example Post"
+        post.body = "Just another test"
+        
+        response = self.client.put("/api/posts/{}".format(postC.id),
+            data=json.dumps(data),
+            content_type="application/json",
+            headers=[("Accept", "application/json")]
+        )
+        
+        
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.mimetype, "application/json")
+        self.assertEqual(urlparse(response.headers.get("Location")).path,
+                         "/api/posts/1")
+        
+        data = json.loads(response.data)
+        self.assertEqual(data["id"], 1)
+        self.assertEqual(data["title"], "Example Post")
+        self.assertEqual(data["body"], "Just another test")
+
+        posts = session.query(models.Post).all()
+        self.assertEqual(len(posts), 1)
+
+        post = posts[0]
+        self.assertEqual(post.title, "Example Post")
+        self.assertEqual(post.body, "Just another test")  
+        
+        
+        def testEditpostnotexist(self):
+            response = self.client.get("/api/posts/1",
+            headers=[("Accept", "application/json")]
+        )
+            self.assertEqual(response.status_code, 404)
+            self.assertEqual(response.mimetype, "application/json")   
+            data = json.loads(response.data)
+            self.assertEqual(data["message"], "Could not find post with id 1")
+        
+         
 if __name__ == "__main__":
     unittest.main()
